@@ -26,6 +26,9 @@
 <script>
   try { if (localStorage.getItem('theme') === 'light') document.documentElement.setAttribute('data-theme', 'light'); } catch (e) {}
   document.documentElement.classList.add('js');
+  window.gcEvent = function (path, title) {
+    try { if (window.goatcounter && window.goatcounter.count) window.goatcounter.count({ path: path, title: title || path, event: true }); } catch (e) {}
+  };
   try {
     if (!sessionStorage.getItem('booted') && !location.hash && !matchMedia('(prefers-reduced-motion: reduce)').matches) {
       document.documentElement.classList.add('booting');
@@ -292,6 +295,8 @@
   footer { border-top: 1px solid var(--line); padding: 26px 0 44px; font-family: var(--mono); font-size: 13px; }
   footer .wrap { display: flex; justify-content: space-between; gap: 12px 24px; flex-wrap: wrap; }
   footer a { padding: 10px 0; }
+  footer .privacy { flex-basis: 100%; margin: 4px 0 0; opacity: .62; font-size: 12px; }
+  footer .privacy a { padding: 0; text-decoration: underline; }
   footer a:hover { text-decoration: underline; }
 
   /* effect: glitch name (black and white only) */
@@ -668,6 +673,7 @@
   <div class="wrap">
     <span>COMMIT; <span class="dim">-- &copy; 2026 Rabogale Matjokotja</span></span>
     <a href="#top">Back to top &uarr;</a>
+    <p class="privacy">Visits are counted anonymously with <a href="https://www.goatcounter.com" rel="noopener">GoatCounter</a>. No cookies.</p>
   </div>
 </footer>
 
@@ -800,6 +806,7 @@
       var R = window.RS || {};
       if (R.cvMissing) { say('My CV is not available yet.'); return; }
       say('Downloading my CV...');
+      if (window.gcEvent) window.gcEvent('cv-console', 'CV via console');
       var cvA = document.getElementById('cv-hero');
       if (cvA) cvA.click();
       return;
@@ -1286,7 +1293,15 @@
     frame.setAttribute('tabindex', '0');
     frame.setAttribute('aria-pressed', 'false');
     frame.setAttribute('aria-label', 'Portrait of Rabogale Matjokotja. Press to switch between black and white and colour.');
+    var flipCounted = false;
+    function countFlip() {
+      if (flipCounted) return;
+      flipCounted = true;
+      if (window.gcEvent) window.gcEvent('photo-flip', 'Photo flipped');
+    }
+    frame.addEventListener('pointerenter', function (e) { if (e.pointerType === 'mouse') countFlip(); });
     var flip = function () {
+      countFlip();
       var on = frame.classList.toggle('flipped');
       frame.setAttribute('aria-pressed', on ? 'true' : 'false');
     };
@@ -1295,6 +1310,13 @@
       if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); flip(); }
     });
   }
+
+  /* ---- count real clicks on the CV links ---- */
+  document.addEventListener('click', function (e) {
+    if (!e.isTrusted) return;
+    var a = e.target && e.target.closest ? e.target.closest('a[href="cv.pdf"]') : null;
+    if (a && window.gcEvent) window.gcEvent('cv-download', 'CV download');
+  });
 
   /* ---- boot screen ---- */
   function runBoot(onDone) {
@@ -1367,5 +1389,6 @@
   else setTimeout(glitch, 1100);
 })();
 </script>
+<script data-goatcounter="https://rabogale.goatcounter.com/count" async src="https://gc.zgo.at/count.js"></script>
 </body>
 </html>
