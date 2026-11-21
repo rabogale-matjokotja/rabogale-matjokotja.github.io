@@ -584,7 +584,20 @@
           </div>
           <p class="sub">A database for members, books, loans and returns, designed from the ERD up. The T-SQL schema is written: 10 tables covering books, authors, copies, members, loans, reservations and fines.</p>
           <p class="techs">MS SQL Server &middot; T-SQL &middot; ERD design</p>
+          <div class="ulinks">
+            <a href="#lib-erd" id="lib-erd-btn" aria-expanded="false" aria-controls="lib-erd">Data model &darr;</a>
+          </div>
         </article>
+
+        <div class="erd-panel" id="lib-erd">
+          <div class="erd-top">
+            <p class="erd-intro">The 10 tables of the library system. Select a table to see its columns and how it connects to the others. Select it again, or press Close, to go back to the overview.</p>
+            <button class="erd-close" type="button" id="lib-erd-hide">Hide</button>
+          </div>
+          <div class="erd-diagram" aria-hidden="true"><svg id="lib-erd-svg" viewBox="0 0 930 382" role="presentation" focusable="false"></svg></div>
+          <div class="erd-chips" id="lib-erd-chips" role="group" aria-label="Tables"></div>
+          <div class="erd-detail" id="lib-erd-detail"></div>
+        </div>
 
       </div>
     </section>
@@ -902,6 +915,91 @@
     }).catch(function () {});
   }
 
+  /* ---------- Library system data model (from LibrarySystem.sql) ---------- */
+  var LIB = {
+    id: 'lib-erd',
+    ORDER: ['Category', 'Book', 'Author', 'BookAuthor', 'BookCopy', 'Membership', 'Librarian', 'Loan', 'Reservation', 'Fine'],
+    DB: {
+      Category: { note: 'Category names live in their own table, so each is stored once.', cols: [
+        ['CategoryID', 'int', 'PK', 'Identity'],
+        ['CategoryName', 'varchar(15)', 'UQ', 'Required and unique'] ] },
+      Book: { note: 'A book title. The physical copies are in BookCopy.', cols: [
+        ['BookID', 'int', 'PK', 'Identity'],
+        ['ISBN', 'varchar(13)', 'UQ', 'Required, exactly 13 characters'],
+        ['Title', 'varchar(30)', '', 'Required'],
+        ['Publisher', 'varchar(30)', '', 'Optional'],
+        ['PublicationYear', 'int', '', 'Optional, between 2000 and the current year'],
+        ['CategoryID', 'int', 'FK Category', 'Required'] ] },
+      Author: { note: 'Authors are separate from books, because a book can have several authors and an author several books.', cols: [
+        ['AuthorID', 'int', 'PK', 'Identity'],
+        ['FirstName', 'varchar(15)', '', 'Optional'],
+        ['LastName', 'varchar(15)', '', 'Required'] ] },
+      BookAuthor: { note: 'Junction table for the many-to-many link between books and authors.', cols: [
+        ['BookID', 'int', 'PK, FK Book', 'Part of the primary key'],
+        ['AuthorID', 'int', 'PK, FK Author', 'Part of the primary key'] ] },
+      BookCopy: { note: 'One row per physical copy, so loans can point at the exact copy that was lent.', cols: [
+        ['CopyID', 'int', 'PK', 'Identity'],
+        ['BookID', 'int', 'FK Book', 'Required'],
+        ['Barcode', 'varchar(30)', 'UQ', 'Required and unique'],
+        ['BookCondition', 'varchar(10)', '', 'New, Good, Worn or Damaged'],
+        ['CopyStatus', 'varchar(10)', '', 'Available, OnLoan or Withdrawn. Default Available'],
+        ['ShelfLocation', 'varchar(10)', '', 'Optional'] ] },
+      Membership: { note: 'Library members. Email is unique, and a member can be suspended.', cols: [
+        ['MemberID', 'int', 'PK', 'Identity'],
+        ['FirstName', 'varchar(15)', '', 'Required'],
+        ['LastName', 'varchar(15)', '', 'Required'],
+        ['Email', 'varchar(30)', 'UQ', 'Required and unique'],
+        ['PhoneNumber', 'varchar(13)', '', 'Optional'],
+        ['JoinDate', 'date', '', 'Default: today'],
+        ['M_Status', 'varchar(20)', '', 'Active or Suspended. Default Active'] ] },
+      Librarian: { note: 'Staff who issue loans. Each loan records which librarian handled it.', cols: [
+        ['LibrarianID', 'int', 'PK', 'Identity'],
+        ['FirstName', 'varchar(15)', '', 'Required'],
+        ['LastName', 'varchar(15)', '', 'Required'],
+        ['Email', 'varchar(30)', 'UQ', 'Required and unique'],
+        ['LibrarianRole', 'varchar(30)', '', 'Librarian or Head Librarian'] ] },
+      Loan: { note: 'A copy lent to a member by a librarian. ReturnDate stays empty until the copy comes back.', cols: [
+        ['LoanID', 'int', 'PK', 'Identity'],
+        ['CopyID', 'int', 'FK BookCopy', 'Required'],
+        ['MemberID', 'int', 'FK Membership', 'Required'],
+        ['LibrarianID', 'int', 'FK Librarian', 'Required'],
+        ['LoanDate', 'date', '', 'Default: today'],
+        ['DueDate', 'date', '', 'Required, not before LoanDate'],
+        ['ReturnDate', 'date', '', 'Optional, not before LoanDate'] ] },
+      Reservation: { note: 'A member reserves a book title, not a specific copy.', cols: [
+        ['ReservationID', 'int', 'PK', 'Identity'],
+        ['BookID', 'int', 'FK Book', 'Required'],
+        ['MemberID', 'int', 'FK Membership', 'Required'],
+        ['ReservedDate', 'date', '', 'Default: today'],
+        ['ExpiryDate', 'date', '', 'Required, not before ReservedDate'],
+        ['R_Status', 'varchar(15)', '', 'Pending, Fulfilled, Expired or Cancelled. Default Pending'] ] },
+      Fine: { note: 'Fines are linked to the loan that caused them.', cols: [
+        ['FineID', 'int', 'PK', 'Identity'],
+        ['LoanID', 'int', 'FK Loan', 'Required'],
+        ['Amount', 'numeric(10,2)', '', 'Required, 0 or more'],
+        ['IssuedDate', 'date', '', 'Default: today'],
+        ['PaidDate', 'date', '', 'Optional'],
+        ['F_Status', 'varchar(15)', '', 'Unpaid, Paid or Waived. Default Unpaid'] ] }
+    },
+    EDGES: [
+      ['Category', 'Book', '1', 'N', 'classifies'],
+      ['Book', 'BookAuthor', '1', 'N', 'listed in'],
+      ['Author', 'BookAuthor', '1', 'N', 'credited in'],
+      ['Book', 'BookCopy', '1', 'N', 'has copies'],
+      ['Book', 'Reservation', '1', 'N', 'reserved as'],
+      ['Membership', 'Reservation', '1', 'N', 'makes'],
+      ['BookCopy', 'Loan', '1', 'N', 'lent in'],
+      ['Membership', 'Loan', '1', 'N', 'borrows'],
+      ['Librarian', 'Loan', '1', 'N', 'issues'],
+      ['Loan', 'Fine', '1', 'N', 'can incur']
+    ],
+    POS: {
+      Category: [10, 168], BookAuthor: [200, 24], Book: [200, 168], Reservation: [200, 312],
+      Author: [390, 24], BookCopy: [390, 168], Membership: [390, 312],
+      Librarian: [580, 24], Loan: [580, 168], Fine: [770, 168]
+    }
+  };
+
   /* ---------- Data model (from schema.sql in the RetailStock repo) ---------- */
   var ORDER = ['Categories', 'Suppliers', 'Products', 'Inventory', 'Customers', 'Orders', 'OrderItems', 'PurchaseOrders', 'PurchaseOrderItems', 'StockMovements'];
   RS.tables = ORDER;
@@ -1020,16 +1118,19 @@
     ['Products', 'PurchaseOrderItems', '1', 'N', 'ordered as']
   ];
 
-  var W = 150, H = 46;
-  var POS = {
+  var RPOS = {
     Categories: [390, 24], Customers: [770, 24],
     Suppliers: [200, 168], Products: [390, 168], OrderItems: [580, 168], Orders: [770, 168],
     PurchaseOrders: [10, 312], PurchaseOrderItems: [200, 312], Inventory: [390, 312], StockMovements: [580, 312]
   };
 
-  var svg = document.getElementById('erd-svg');
-  var chipsBox = document.getElementById('erd-chips');
-  var detail = document.getElementById('erd-detail');
+  function buildErd(P) {
+  var ORDER = P.ORDER, DB = P.DB, EDGES = P.EDGES, POS = P.POS, ID = P.id;
+  var W = 150, H = 46;
+
+  var svg = document.getElementById(ID + '-svg');
+  var chipsBox = document.getElementById(ID + '-chips');
+  var detail = document.getElementById(ID + '-detail');
   if (!svg || !chipsBox || !detail) return;
 
   function el(name, attrs, parent) {
@@ -1175,8 +1276,8 @@
     renderDetail(t);
   }
   clear();
-  var panel = document.getElementById('erd');
-  var openBtn = document.getElementById('erd-btn');
+  var panel = document.getElementById(ID);
+  var openBtn = document.getElementById(ID + '-btn');
   function setPanel(open, focusBtn) {
     if (!open) clear();
     panel.hidden = !open;
@@ -1186,13 +1287,16 @@
     else if (focusBtn) openBtn.focus();
   }
   openBtn.addEventListener('click', function (e) { e.preventDefault(); setPanel(panel.hidden); });
-  document.getElementById('erd-hide').addEventListener('click', function () { setPanel(false, true); });
+  document.getElementById(ID + '-hide').addEventListener('click', function () { setPanel(false, true); });
   panel.addEventListener('keydown', function (e) {
     if (e.key !== 'Escape') return;
     if (current) { var prev = clear(); if (chips[prev]) chips[prev].focus(); }
     else setPanel(false, true);
   });
-  setPanel(location.hash === '#erd');
+  setPanel(location.hash === '#' + ID);
+  }
+  buildErd({ id: 'erd', ORDER: ORDER, DB: DB, EDGES: EDGES, POS: RPOS });
+  buildErd(LIB);
 
   /* ---------- Live GitHub activity ---------- */
   var sec = document.getElementById('activity');
